@@ -20,9 +20,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
+add_executable(complementaryfilter src/mpu6050_complementaryfilter.cpp)
+ament_target_dependencies(complementaryfilter rclcpp sensor_msgs)
 add_executable(mpu6050driver src/mpu6050driver.cpp src/mpu6050sensor.cpp)
 ament_target_dependencies(mpu6050driver rclcpp sensor_msgs)
 target_link_libraries(mpu6050driver i2c)
+target_link_libraries(mpu6050driver PRIVATE m)
 target_include_directories(
   mpu6050driver PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                        $<INSTALL_INTERFACE:include>)

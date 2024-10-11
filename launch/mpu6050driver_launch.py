@@ -26,6 +26,13 @@ def generate_launch_description():
         parameters=[parameter_file]
     )
 
+    filter_node = Node(
+        package='mpu6050driver',
+        executable='complementaryfilter',
+        name='filter_node',
+    )
+
     ld.add_action(params_declare)
     ld.add_action(mpu6050driver_node)
+    ld.add_action(filter_node)
     return ld

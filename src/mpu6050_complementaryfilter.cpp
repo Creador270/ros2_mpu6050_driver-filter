@@ -1,54 +1,64 @@
-#include "mpu6050driver/mpu6050_complementaryfilter.h"
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #include <memory>
 #include <math.h> 
 
-MPU6050Dfilter::MPU6050Dfilter(): Node("filter_node"){
-
-    // Create subscriber
-    subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(
-        "imu", 10, std::bind(&MPU6050Dfilter::handleImu, this, _1));
-
-    // Create publisher
-    //publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("Angles", 10);
-    }
+//#include "mpu6050driver/mpu6050sensor.hpp"
 
 
-void MPU6050Dfilter::FilterImu(const sensor_msgs::msg::Imu::SharedPtr msg)
-{
-    //Acelerations
-    double ax = msg->linear_acceleration.x;
-    double ay = msg->linear_acceleration.y;
-    double az = msg->linear_acceleration.z;
+class MPU6050filter : public rclcpp::Node {
+    public:
+        MPU6050filter(): Node("filter_node")
+        {
+            // Create subscriber
+            subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(
+                "imu", 10, std::bind(&MPU6050filter::FilterImu, this, std::placeholders::_1));
+        }
+    private:
+        void FilterImu(const sensor_msgs::msg::Imu::SharedPtr msg)
+        {
+            //Acelerations
+            double ax = msg->linear_acceleration.x;
+            double ay = msg->linear_acceleration.y;
+            double az = msg->linear_acceleration.z;
 
-    //Gyroscopes
-    double gx = msg->angular_velocity.x;
-    double gy = msg->angular_velocity.y;
-    double gz = msg->angular_velocity.z;
+            //Gyroscopes
+            double gx = msg->angular_velocity.x;
+            double gy = msg->angular_velocity.y;
+            double gz = msg->angular_velocity.z;
 
-    //Complementary filter
-    double dt = 0.01;
-    float rad_to_deg = 180/3.141592654;
-    float Acceleration_angle[3];
-    float Total_angle[3];
+            //Complementary filter
+            double dt = 0.01;
+            double rad_to_deg = 180/3.141592654;
+            double Acceleration_angle[3] = {0.0, 0.0, 0.0};
+            double Total_angle[3] = {0.0, 0.0, 0.0};
 
-    Acceleration_angle[0] = atan((ay / 16384.0) / sqrt(pow(ax/16384.0, 2) + pow(az/16384.0, 2))) * rad_to_deg;
-    Acceleration_angle[1] = atan(-1 * (ax / 16384.0) / sqrt(pow(ay/16384.0, 2) + pow(az/16384.0, 2))) * rad_to_deg;
-    //Acceleration_angle[2] = atan((az / 16384.0) / sqrt(pow(ax/16384.0, 2) + pow(ay/16384.0, 2))) * rad_to_deg;
+            Acceleration_angle[0] = atan((ay / 16384.0) / sqrt(pow(ax/16384.0, 2) + pow(az/16384.0, 2))) * rad_to_deg;
+            Acceleration_angle[1] = atan(-1 * (ax / 16384.0) / sqrt(pow(ay/16384.0, 2) + pow(az/16384.0, 2))) * rad_to_deg;
+            Acceleration_angle[2] = atan((az / 16384.0) / sqrt(pow(ax/16384.0, 2) + pow(ay/16384.0, 2))) * rad_to_deg;
 
-    Total_angle[0] = 0.98 *(Total_angle[0] + (gx / 131.0)) + 0.02 * Acceleration_angle[0];
-    Total_angle[1] = 0.98 *(Total_angle[1] + (gy / 131.0)) + 0.02 * Acceleration_angle[1];
-    //Total_angle[2] = 0.98 *(Total_angle[2] + (gz / 131.0)) + 0.02 * Acceleration_angle[2];
+            Total_angle[0] = 0.98 *(Total_angle[0] + (gx / 131.0)*dt) + 0.02 * Acceleration_angle[0];
+            Total_angle[1] = 0.98 *(Total_angle[1] + (gy / 131.0)*dt) + 0.02 * Acceleration_angle[1];
+            Total_angle[2] = 0.98 *(Total_angle[2] + (gz / 131.0)*dt) + 0.02 * Acceleration_angle[2];
 
-    RCLCPP_INFO(this->get_logger(), "Angles in X: '%s'" , std::to_string(Total_angle[0]));
-    RCLCPP_INFO(this->get_logger(), "Angles in Y: '%s'" , std::to_string(Total_angle[1]));
-    //RCLCPP_INFO(this->get_logger(), "Angles in Z: '%s'" , std::to_string(Total_angle[2]));
+            RCLCPP_INFO(this->get_logger(), "Angles in X: '%f'" , Total_angle[0]);
+            RCLCPP_INFO(this->get_logger(), "Angles in Y: '%f'" , Total_angle[1]);
+            //RCLCPP_INFO(this->get_logger(), "Angles in Z: '%s'" , std::to_string(Total_angle[2]));
 
-}
+            //sensor_msgs::msg::Imu filtered_msg;
+            //filtered_msg.header = msg->header;
+        }
+
+        rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_;
+        //rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher_;
+
+};
 
 int main(int argc, char * argv[]){
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<MPU6050Dfilter>());
+    rclcpp::spin(std::make_shared<MPU6050filter>());
     rclcpp::shutdown();
     return 0;
 }

@@ -30,6 +30,7 @@ def generate_launch_description():
         package='mpu6050driver',
         executable='complementaryfilter',
         name='filter_node',
+        output="screen",
     )
 
     ld.add_action(params_declare)

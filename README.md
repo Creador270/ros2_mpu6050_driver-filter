@@ -33,3 +33,11 @@ Launch it:
 
     ros2 launch mpu6050driver mpu6050driver_launch.py
 
+Launch driver node:
+
+    ros2 run mpu6050driver mpu6050driver
+
+Launch filter node:
+
+    ros2 run mpu6050driver complementaryfilter
+

@@ -1,0 +1,14 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/media/creador270/Storage1/creador270/ros2_test_workspace/build/my_package",
+        "/media/creador270/Storage1/creador270/ros2_test_workspace/install/my_package/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/media/creador270/Storage1/creador270/ros2_test_workspace/build/my_package",
+        "/media/creador270/Storage1/creador270/ros2_test_workspace/install/my_package/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

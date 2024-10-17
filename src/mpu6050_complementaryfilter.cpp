@@ -1,6 +1,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 
 #include <memory>
 #include <math.h> 
@@ -15,6 +16,9 @@ class MPU6050filter : public rclcpp::Node {
             // Create subscriber
             subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(
                 "imu", 10, std::bind(&MPU6050filter::FilterImu, this, std::placeholders::_1));
+
+            // Create publisher
+            publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("angles", 10);
         }
     private:
         void FilterImu(const sensor_msgs::msg::Imu::SharedPtr msg)
@@ -47,12 +51,17 @@ class MPU6050filter : public rclcpp::Node {
             RCLCPP_INFO(this->get_logger(), "Angles in Y: '%f'" , Total_angle[1]);
             //RCLCPP_INFO(this->get_logger(), "Angles in Z: '%s'" , std::to_string(Total_angle[2]));
 
+            // Publicar los ángulos en el tópico 'angles'
+            auto angles = std_msgs::msg::Float64MultiArray();
+            angles.data = {Total_angle[0], Total_angle[1]};
+            publisher_->publish(angles);
+
             //sensor_msgs::msg::Imu filtered_msg;
             //filtered_msg.header = msg->header;
         }
 
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_;
-        //rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher_;
+        rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr publisher_;
 
 };
 

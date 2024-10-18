@@ -19,10 +19,17 @@ class MPU6050filter : public rclcpp::Node {
 
             // Create publisher
             publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("angles", 10);
+
+            // Inicialize the time
+            previous_time_ = this->now();
         }
     private:
         void FilterImu(const sensor_msgs::msg::Imu::SharedPtr msg)
         {
+            auto timel = this->now();  // actual time read
+            double dt = (timel - previous_time_).seconds();
+            previous_time_ = timel;
+
             //Acelerations
             double ax = msg->linear_acceleration.x;
             double ay = msg->linear_acceleration.y;
@@ -31,27 +38,42 @@ class MPU6050filter : public rclcpp::Node {
             //Gyroscopes
             double gx = msg->angular_velocity.x;
             double gy = msg->angular_velocity.y;
-            double gz = msg->angular_velocity.z;
 
             //Complementary filter
-            double dt = 0.01;
             double rad_to_deg = 180/3.141592654;
-            double Acceleration_angle[3] = {0.0, 0.0, 0.0};
-            double Total_angle[3] = {0.0, 0.0, 0.0};
+            double Acceleration_angle[2] = {0.0, 0.0};
+            double Gyroscope_angle[2] = {0.0, 0.0};
+            double Total_angle[2] = {0.0, 0.0};
+            
 
-            Acceleration_angle[0] = atan((ay / 16384.0) / sqrt(pow(ax/16384.0, 2) + pow(az/16384.0, 2))) * rad_to_deg;
-            Acceleration_angle[1] = atan(-1 * (ax / 16384.0) / sqrt(pow(ay/16384.0, 2) + pow(az/16384.0, 2))) * rad_to_deg;
-            Acceleration_angle[2] = atan((az / 16384.0) / sqrt(pow(ax/16384.0, 2) + pow(ay/16384.0, 2))) * rad_to_deg;
+            // Acceleration_angle[0] = atan2(ay, az);
+            // Acceleration_angle[1] = atan2( -ax, sqrt(pow(ay, 2) + pow(az, 2)));
+            /*We implement the euler formula to calculate the angle troug the accelerometer also we change 
+             * the aceleration data to LSB/g acordin the sensitive scale factor AFS_SEL=0 usin the value 16384.0
+             * from the datasheet*/
 
-            Total_angle[0] = 0.98 *(Total_angle[0] + (gx / 131.0)*dt) + 0.02 * Acceleration_angle[0];
-            Total_angle[1] = 0.98 *(Total_angle[1] + (gy / 131.0)*dt) + 0.02 * Acceleration_angle[1];
-            Total_angle[2] = 0.98 *(Total_angle[2] + (gz / 131.0)*dt) + 0.02 * Acceleration_angle[2];
+            /*Euler formula:
+            */
 
-            RCLCPP_INFO(this->get_logger(), "Angles in X: '%f'" , Total_angle[0]);
-            RCLCPP_INFO(this->get_logger(), "Angles in Y: '%f'" , Total_angle[1]);
+            Acceleration_angle[0] = atan((ay/16384.0)/sqrt(pow((ax/16384.0),2) + pow((az/16384.0),2)))*rad_to_deg;
+            Acceleration_angle[1] = atan( -1 * (ax/16384.0)/sqrt(pow((ay /16384.0),2) + pow((az/16384.0),2)))*rad_to_deg;
+
+            /*Seting the giroscope data to LSB/(º/s) acordin the sensitive scale factor FS_SEL=0 usin the value 131
+             * from the datasheet*/
+
+            Gyroscope_angle[0] = gx/131.0;
+            Gyroscope_angle[1] = gy/131.0;
+
+            /*Aplaying the complementary filter and integrate the angle velocities of the gyroscope, we use a alpa of 0.98*/
+
+            Total_angle[0] = 0.98 *(Total_angle[0] + (Gyroscope_angle[0] * dt)) + (0.02*Acceleration_angle[0]);
+            Total_angle[1] = 0.98 *(Total_angle[1] + (Gyroscope_angle[1] * dt)) + (0.02*Acceleration_angle[1]);
+
+            //RCLCPP_INFO(this->get_logger(), "Angles in X: '%f'" , Total_angle[0]);
+            //RCLCPP_INFO(this->get_logger(), "Angles in Y: '%f'" , Total_angle[1]);
             //RCLCPP_INFO(this->get_logger(), "Angles in Z: '%s'" , std::to_string(Total_angle[2]));
 
-            // Publicar los ángulos en el tópico 'angles'
+            // Public the angles in the topic 'angles'
             auto angles = std_msgs::msg::Float64MultiArray();
             angles.data = {Total_angle[0], Total_angle[1]};
             publisher_->publish(angles);
@@ -62,6 +84,7 @@ class MPU6050filter : public rclcpp::Node {
 
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_;
         rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr publisher_;
+        rclcpp::Time previous_time_;
 
 };
 

@@ -1,0 +1,17 @@
+### ROS2 ###
+install/
+log/
+build/
+
+# qcreator stuff
+srv/_*.py
+*.pcd
+*.pyc
+qtcreator-*
+*.user
+
+*~
+
+# Colcon custom files
+COLCON_IGNORE
+AMENT_IGNORE

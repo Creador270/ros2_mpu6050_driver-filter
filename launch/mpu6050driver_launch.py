@@ -31,6 +31,8 @@ def generate_launch_description():
         executable='complementaryfilter',
         name='filter_node',
         output="screen",
+        #parameters=[{'constant_dt': 0.1}],
+
     )
 
     ld.add_action(params_declare)

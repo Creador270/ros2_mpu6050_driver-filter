@@ -1,7 +1,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "std_msgs/msg/string.hpp"
-#include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 
 #include <memory>
 #include <math.h> 
@@ -11,39 +11,69 @@
 
 class MPU6050filter : public rclcpp::Node {
     public:
-        MPU6050filter(): Node("filter_node")
+        MPU6050filter(): Node("filter_node"), time(this->now()) //tiempo inicial
         {
             // Create subscriber
             subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(
-                "imu", 10, std::bind(&MPU6050filter::FilterImu, this, std::placeholders::_1));
+                "imu/data_raw", 10, std::bind(&MPU6050filter::FilterImu, this, std::placeholders::_1));
 
             // Create publisher
-            publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("angles", 10);
+            publisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("angles", 10);
 
-            // Inicialize the time
-            previous_time_ = this->now();
+            declare_parameter<float>("constant_dt", 0.0);
+            get_parameter("constant_dt", constant_dt_);
+            RCLCPP_INFO_STREAM(get_logger(), "ElapsedTime dt: " << constant_dt_);
+
         }
     private:
+
         void FilterImu(const sensor_msgs::msg::Imu::SharedPtr msg)
         {
-            auto timel = this->now();  // actual time read
-            double dt = (timel - previous_time_).seconds();
-            previous_time_ = timel;
+
+            last_time_ = time;
+            time = msg->header.stamp;
+            //time = this->now();
+            //RCLCPP_INFO(this->get_logger(), "Timestamp: '%f'", time.seconds());
+
+            
+            // dt = (time - last_time_).seconds();
+            // last_time_ = ros::Time::now();
+
+            float dt;
+            if (constant_dt_ > 0.0){
+                dt = constant_dt_;
+                RCLCPP_INFO(this->get_logger(), "Time dt: '%f'", dt);
+            }else
+            {
+                dt = (time - last_time_).seconds();
+                // if (time == 0)
+                //     RCLCPP_WARN_STREAM_THROTTLE(
+                //         5.0,
+                //         "The IMU message time stamp is zero, and the parameter "
+                //         "constant_dt is not set!"
+                //             << " The filter will not update the orientation.");
+
+                RCLCPP_INFO(this->get_logger(), "Time dt: '%f', Time: '%f', Time prev: '%f'", dt, time.seconds(), last_time_.seconds());
+            }
+
+            // auto timel = this->now();  // actual time read
+            // float dt = (timel - previous_time_).seconds();
+            // previous_time_ = timel;
 
             //Acelerations
-            double ax = msg->linear_acceleration.x;
-            double ay = msg->linear_acceleration.y;
-            double az = msg->linear_acceleration.z;
+            double ax = (msg->linear_acceleration.x) / 9.80665;
+            double ay = msg->linear_acceleration.y / 9.80665;
+            double az = msg->linear_acceleration.z / 9.80665;
 
             //Gyroscopes
             double gx = msg->angular_velocity.x;
             double gy = msg->angular_velocity.y;
 
             //Complementary filter
-            double rad_to_deg = 180/3.141592654;
-            double Acceleration_angle[2] = {0.0, 0.0};
-            double Gyroscope_angle[2] = {0.0, 0.0};
-            double Total_angle[2] = {0.0, 0.0};
+            float rad_to_deg = 180/M_PI;
+            float Acceleration_angle[2] = {0.0, 0.0};
+            float Gyroscope_angle[2] = {0.0, 0.0};
+            float Total_angle[2] = {0.0, 0.0};
             
 
             // Acceleration_angle[0] = atan2(ay, az);
@@ -61,8 +91,8 @@ class MPU6050filter : public rclcpp::Node {
             /*Seting the giroscope data to LSB/(º/s) acordin the sensitive scale factor FS_SEL=0 usin the value 131
              * from the datasheet*/
 
-            Gyroscope_angle[0] = gx/131.0;
-            Gyroscope_angle[1] = gy/131.0;
+            Gyroscope_angle[0] = (gx/131.0);
+            Gyroscope_angle[1] = (gy/131.0);
 
             /*Aplaying the complementary filter and integrate the angle velocities of the gyroscope, we use a alpa of 0.98*/
 
@@ -74,18 +104,19 @@ class MPU6050filter : public rclcpp::Node {
             //RCLCPP_INFO(this->get_logger(), "Angles in Z: '%s'" , std::to_string(Total_angle[2]));
 
             // Public the angles in the topic 'angles'
-            auto angles = std_msgs::msg::Float64MultiArray();
-            angles.data = {Total_angle[0], Total_angle[1]};
+            auto angles = std_msgs::msg::Float32MultiArray();
+            angles.data = {dt, Gyroscope_angle[0]* rad_to_deg, Gyroscope_angle[1]* rad_to_deg, (Gyroscope_angle[0]*rad_to_deg) * dt, (Gyroscope_angle[1]*rad_to_deg) * dt};
             publisher_->publish(angles);
 
             //sensor_msgs::msg::Imu filtered_msg;
             //filtered_msg.header = msg->header;
         }
 
+        float constant_dt_;
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_;
-        rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr publisher_;
-        rclcpp::Time previous_time_;
-
+        rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr publisher_;
+        rclcpp::Time time;
+        rclcpp::Time last_time_; 
 };
 
 int main(int argc, char * argv[]){

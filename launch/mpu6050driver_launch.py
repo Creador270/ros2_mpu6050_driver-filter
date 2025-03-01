@@ -27,13 +27,18 @@ def generate_launch_description():
     )
 
     filter_node = Node(
-        package='mpu6050driver',
-        executable='complementaryfilter',
-        name='filter_node',
-        output="screen",
-        #parameters=[{'constant_dt': 0.1}],
-
-    )
+                package='imu_complementary_filter',
+                node_executable='complementary_filter_node',
+                name='complementary_filter_gain_node',
+                output='screen',
+                parameters=[
+                    {'do_bias_estimation': True},
+                    {'do_adaptive_gain': True},
+                    {'use_mag': False},
+                    {'gain_acc': 0.01},
+                    {'gain_mag': 0.01},
+                ],
+            ) 
 
     ld.add_action(params_declare)
     ld.add_action(mpu6050driver_node)
